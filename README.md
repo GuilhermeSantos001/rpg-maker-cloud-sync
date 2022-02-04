@@ -1,2 +1,2 @@
-# rpg-maker-cloud-sync-
+# rpg-maker-cloud-sync
 Cloud Sync
