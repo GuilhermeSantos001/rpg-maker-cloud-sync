@@ -1,0 +1,21 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["mongoDb"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model SaveData {
+  id                   String @id @default(dbgenerated()) @map("_id") @db.ObjectId
+  gameId               String @unique
+  gameToken            String @unique
+  playerId             String
+  saveNum              Int
+  compatibilityVersion Int
+  data                 String
+
+  @@map("saves")
+}
