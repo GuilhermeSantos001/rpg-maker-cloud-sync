@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 
 import { prismaClient } from '../database/PrismaClient';
 import { CreateThrowErrorController } from './CreateThrowErrorController';
+import { ResponseThrowErrorController } from './ResponseThrowErrorController';
 
 export class CreateSaveGameController {
   async handle(request: Request, response: Response) {
@@ -25,6 +26,22 @@ export class CreateSaveGameController {
     > = request.body;
 
     const createThrowErrorController = new CreateThrowErrorController();
+    const responseThrowErrorController = new ResponseThrowErrorController();
+
+    if (await prismaClient.saveData.findFirst({
+      where: {
+        gameId,
+        gameToken,
+        playerId,
+        type,
+        saveNum,
+        compatibilityVersion
+      }
+    }))
+      return responseThrowErrorController.handle(
+        new Error("Save already exists"),
+        'Retry with a different saveNum or compatibilityVersion',
+      )
 
     return response.json(await createThrowErrorController.handle<SaveData>(
       prismaClient.saveData.create({
