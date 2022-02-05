@@ -1,6 +1,5 @@
 import { SaveData } from '@prisma/client';
 import { Request, Response } from 'express';
-import { compressToBase64 } from 'lz-string';
 
 import { prismaClient } from '../database/PrismaClient';
 import { CreateThrowErrorController } from './CreateThrowErrorController';
@@ -11,6 +10,7 @@ export class CreateSaveGameController {
       gameId,
       gameToken,
       playerId,
+      type,
       saveNum,
       compatibilityVersion,
       data
@@ -18,6 +18,7 @@ export class CreateSaveGameController {
       | 'gameId'
       | 'gameToken'
       | 'playerId'
+      | 'type'
       | 'saveNum'
       | 'compatibilityVersion'
       | 'data'
@@ -28,9 +29,10 @@ export class CreateSaveGameController {
     return response.json(await createThrowErrorController.handle<SaveData>(
       prismaClient.saveData.create({
         data: {
-          gameId: compressToBase64(gameId),
-          gameToken: compressToBase64(gameToken),
-          playerId: compressToBase64(playerId),
+          gameId,
+          gameToken,
+          playerId,
+          type,
           saveNum,
           compatibilityVersion,
           data

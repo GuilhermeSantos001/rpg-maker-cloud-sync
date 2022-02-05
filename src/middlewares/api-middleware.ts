@@ -1,11 +1,10 @@
 /**
  * @description Verifica se o token do usuário está válido
  * @author GuilhermeSantos001
- * @update 03/02/2022
+ * @update 05/02/2022
  */
 import { Request, Response, NextFunction } from 'express';
 import { createHash } from 'crypto';
-import { decompressFromBase64 } from 'lz-string';
 
 import getReqProps from '../utils/getReqProps';
 
@@ -15,8 +14,7 @@ export default async function asyAPIMiddleware(req: Request, res: Response, next
 
     if (
         !authorization ||
-        code != authorization &&
-        code != decompressFromBase64(authorization)
+        code != authorization
     )
         return res.status(500).send({
             success: false,

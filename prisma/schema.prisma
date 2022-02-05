@@ -10,9 +10,10 @@ datasource db {
 
 model SaveData {
   id                   String @id @default(dbgenerated()) @map("_id") @db.ObjectId
-  gameId               String @unique
-  gameToken            String @unique
+  gameId               String
+  gameToken            String
   playerId             String
+  type                 String
   saveNum              Int
   compatibilityVersion Int
   data                 String
