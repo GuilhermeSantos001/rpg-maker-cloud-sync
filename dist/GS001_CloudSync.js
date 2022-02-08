@@ -92,7 +92,7 @@
 (function () {
   "use strict";
 
-  require('nw.gui').Window.get().showDevTools()
+  require('nw.gui').Window.get().showDevTools();
 
   //-----------------------------------------------------------------------------
   // Parameters
@@ -123,6 +123,7 @@
     _WINDOW_CLOUD_SYNC_IS_TIMEOUT_MS = 3000;
 
   let
+    _CLOUD_SYNC_QUEUE,
     _CLOUD_SYNC_LOADED = false,
     _CLOUD_SYNC_LOAD_DATA = [];
 
@@ -148,30 +149,37 @@
     },
     saveGameResponseSuccess = (data) => {
       if (!data.success) {
+        _CLOUD_SYNC_QUEUE.retry();
         console.error('Cloud Sync Error:', data);
         openWindowCloudSync(saveGameMessage2);
       }
 
+      _CLOUD_SYNC_QUEUE.finish();
       openWindowCloudSync(saveGameMessage1);
     },
     saveGameResponseError = (error) => {
+      _CLOUD_SYNC_QUEUE.retry();
       console.error('Cloud Sync Error:', error);
       openWindowCloudSync(saveGameMessage2);
     },
     updateGameResponseSuccess = (data) => {
       if (!data.success) {
+        _CLOUD_SYNC_QUEUE.retry();
         console.error('Cloud Sync Error:', data);
         openWindowCloudSync(saveGameMessage6);
       }
 
+      _CLOUD_SYNC_QUEUE.finish();
       openWindowCloudSync(saveGameMessage5);
     },
     updateGameResponseError = (error) => {
+      _CLOUD_SYNC_QUEUE.retry();
       console.error('Cloud Sync Error:', error);
       openWindowCloudSync(saveGameMessage6);
     },
     loadGameResponseSuccess = (data) => {
       if (!data.success) {
+        _CLOUD_SYNC_QUEUE.retry();
         console.error('Cloud Sync Error:', data);
         openWindowCloudSync(saveGameMessage4);
       }
@@ -184,26 +192,33 @@
           savefileId = save.saveNum,
           json = LZString.decompressFromBase64(save.data);
 
-        if (save.playerId == playerId)
+        if (save.playerId == playerId) {
           StorageManager.save(savefileId, json);
+        }
       });
 
       if (_CLOUD_SYNC_LOAD_DATA.length > 0)
         openWindowCloudSync(saveGameMessage3);
+
+      _CLOUD_SYNC_QUEUE.finish();
     },
     loadGameResponseError = (error) => {
+      _CLOUD_SYNC_QUEUE.retry();
       console.error('Cloud Sync Error:', error);
       openWindowCloudSync(saveGameMessage4);
     },
     removeGameResponseSuccess = (data) => {
       if (!data.success) {
+        _CLOUD_SYNC_QUEUE.retry();
         console.error('Cloud Sync Error:', data);
         openWindowCloudSync(saveGameMessage8);
       }
 
+      _CLOUD_SYNC_QUEUE.finish();
       openWindowCloudSync(saveGameMessage7);
     },
     removeGameResponseError = (error) => {
+      _CLOUD_SYNC_QUEUE.retry();
       console.error('Cloud Sync Error:', error);
       openWindowCloudSync(saveGameMessage8);
     },
@@ -279,18 +294,80 @@
     }
 
   //-----------------------------------------------------------------------------
+  // Queue
+  //
+  class Queue {
+    constructor() {
+      this.queue = [];
+      this.precessing = false;
+    }
+
+    process() {
+      if (this.queue.length <= 0) return;
+      if (this.precessing) return;
+
+      console.log('Queue Process:', this.queue);
+
+      this.precessing = true;
+
+      const { type, value, options } = this.queue[0];
+
+      if (options.retryCount >= options.retry)
+        return this.finish();
+
+      if (type == 'save')
+        return saveGameFile(value.gameId, value.gameToken, value.playerId, value.type, value.saveNum, value.data);
+
+      if (type == 'update')
+        return updateGameFile(value.id, value.data);
+
+      if (type == 'load')
+        return loadGameFiles(value.gameId, value.gameToken);
+
+      if (type == 'remove')
+        return removeGameFile(value.id);
+
+      return this.finish();
+    }
+
+    finish() {
+      console.log('Queue Finish', this.queue[0]);
+      this.queue.shift();
+      this.precessing = false;
+    }
+
+    retry() {
+      console.log('Queue Retry', this.queue[0]);
+      this.queue[0].options.retryCount++;
+      this.precessing = false;
+    }
+
+    push(type, value, options = { retry: 3, retryCount: 0 }) {
+      this.queue.push({
+        type,
+        value,
+        options
+      });
+    }
+  }
+
+  _CLOUD_SYNC_QUEUE = new Queue();
+
+  //-----------------------------------------------------------------------------
   // Game_Temp
   //
   Game_Temp.prototype.cloudSyncSetPlayerId = (name) => {
     playerId = name;
     saveLocalConfig(LZString.compressToBase64(JSON.stringify({ playerId: name })));
   };
-  Game_Temp.prototype.cloudSyncLoad = () => loadGameFiles(gameId, gameToken);
+
+  Game_Temp.prototype.cloudSyncLoad = () => _CLOUD_SYNC_QUEUE.push('load', { gameId, gameToken });
+
   Game_Temp.prototype.cloudSyncFileRemove = (saveNum) => {
     _CLOUD_SYNC_LOAD_DATA.forEach(save => {
       if (save.saveNum == saveNum) {
         StorageManager.remove(saveNum);
-        removeGameFile(save.id);
+        _CLOUD_SYNC_QUEUE.push('remove', { id: save.id });
       }
     })
   }
@@ -310,10 +387,20 @@
       const save = _CLOUD_SYNC_LOAD_DATA.find(save => save.compatibilityVersion == compatibilityVersion && save.type == type && save.saveNum == savefileId);
 
       if (save)
-        return updateGameFile(save.id, data);
+        return _CLOUD_SYNC_QUEUE.push('update', {
+          id: save.id,
+          data
+        });
     }
 
-    saveGameFile(gameId, gameToken, playerId, type, savefileId, data);
+    _CLOUD_SYNC_QUEUE.push('save', {
+      gameId,
+      gameToken,
+      playerId,
+      type,
+      saveNum: savefileId,
+      data
+    });
   };
 
   //-----------------------------------------------------------------------------
@@ -330,8 +417,17 @@
         playerId = _playerID;
       }
 
-      loadGameFiles(gameId, gameToken);
+      _CLOUD_SYNC_QUEUE.push('load', {
+        gameId,
+        gameToken
+      });
     }
+  };
+
+  const _scene_base_update = Scene_Base.prototype.update;
+  Scene_Base.prototype.update = function () {
+    _scene_base_update.apply(this, arguments);
+    _CLOUD_SYNC_QUEUE.process();
   };
 
   //-----------------------------------------------------------------------------
