@@ -38,7 +38,7 @@ export class CreateSaveGameController {
         compatibilityVersion
       }
     }))
-      return response.json(responseThrowErrorController.handle(
+      return response.json(await responseThrowErrorController.handle(
         new Error("Save already exists"),
         'Retry with a different saveNum or compatibilityVersion',
       ));
