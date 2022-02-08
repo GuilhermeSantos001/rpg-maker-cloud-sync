@@ -23,5 +23,5 @@ app.use(express.json());
 app.use('/api/v1/', APIRouter);
 
 server.listen(process.env.PORT || 4000, () => {
-  console.log('listening on *:4000');
+  console.log(`Server is running on port ${process.env.PORT || 4000}`);
 });

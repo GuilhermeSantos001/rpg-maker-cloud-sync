@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "rpgmaker_cloud_sync",
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",

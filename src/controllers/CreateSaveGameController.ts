@@ -38,10 +38,10 @@ export class CreateSaveGameController {
         compatibilityVersion
       }
     }))
-      return responseThrowErrorController.handle(
+      return response.json(responseThrowErrorController.handle(
         new Error("Save already exists"),
         'Retry with a different saveNum or compatibilityVersion',
-      )
+      ));
 
     return response.json(await createThrowErrorController.handle<SaveData>(
       prismaClient.saveData.create({
